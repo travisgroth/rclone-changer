@@ -1,0 +1,195 @@
+#!/usr/bin/env python
+
+import logging
+import argparse
+import sys
+import yaml
+import os.path
+import os
+import subprocess
+import fcntl
+
+class Rclone(object):
+    rclone = '/usr/bin/rclone'
+    config = '/etc/bacula/rclone.conf'
+    logFile = '/tmp/rclone.log'
+
+    @staticmethod
+    def _exec_(*args):
+
+        options = ['--config=%s' % Rclone.config, '--log-file=%s' % Rclone.logFile, '-q']
+        logging.debug('Executing: rclone %s %s' % (' '.join(options),' '.join(args) ))
+
+        output = open(os.devnull,'w')
+
+        callList = [ Rclone.rclone ] + options + __builtins__.list(args)
+        r = subprocess.call(callList,stderr=output,stdout=output)
+        
+        if r != 0:
+            raise Exception('Rclone command failed.  Check log' % Rclone.logFile )
+        else:
+            return True
+
+    @staticmethod
+    def copy(source,destination):
+        return Rclone._exec_('copy',source,destination)
+
+    @staticmethod
+    def move(source,destination):
+        return Rclone._exec_('move',source,destination)
+
+    @staticmethod
+    def ls(path):
+        return Rclone._exec_('ls', path)
+
+    @staticmethod
+    def exists(path):
+        try:
+            Rclone._exec_('ls', path)
+        except Exception: 
+            return False
+
+        return True
+
+class State(object):
+    loadedSlot = 0
+    slots = 8192
+
+class CommandOpts(object):
+    changer = None
+    command = None
+    slot = None
+    archive = None
+
+    def __init__(self, params):
+        self.changer = params.changerdevice
+        self.slot = params.slot
+        self.archive = params.archivedevice
+
+def parseArgs(args):
+    defaults = { 
+                    'logfile': '/var/log/bacula/acd-changer.log', 
+                    'statefile': '/var/lib/bacula/acdchangerstate', 
+                }
+
+    parser = argparse.ArgumentParser()
+    parser.set_defaults(**defaults)
+    parser.add_argument('--rclone_config', default='/etc/bacula/rclone.conf')
+    parser.add_argument('changerdevice')
+    parser.add_argument('command')
+    parser.add_argument('slot')
+    parser.add_argument('archivedevice')
+
+    return parser.parse_args()
+
+def loaded(opts,state):
+    print state.loadedSlot
+
+def load(opts, state):
+    logging.info("Loading volume %s into %s from %s" % (opts.slot,opts.archive,opts.changer))
+    
+    source = "/".join([opts.changer,opts.slot,os.path.basename(opts.archive)])
+    destination = os.path.dirname(opts.archive)
+
+    if state.loadedSlot != 0 and state.loadedSlot != opts.slot:
+        logging.warning("Asked to load volume %s into %s but %s is loaded.  Unloading %s" % 
+            (opts.slot,opts.archive,state.loadedSlot,state.loadedSlot))
+
+        unloadOpts = argparse.Namespace()
+        unloadOpts.slot = state.loadedSlot
+        unloadOpts.archive = opts.archive
+        unloadOpts.changer = opts.changer
+        unload(unloadOpts, state)
+    
+    if state.loadedSlot == opts.slot:    
+        logging.info("Volume %s already loaded at %s from %s" % (opts.slot,opts.archive,opts.changer))
+        return
+
+    logging.info("Copying %s to %s for load" % (source, destination))
+
+    if Rclone.exists(source):
+        Rclone.copy(source,destination)
+    else:
+        logging.warning("Volume %s didn't exist in %s.  Creating a new file" % (opts.slot, opts.changer))
+        os.unlink(opts.archive)
+        open(opts.archive,'w').close()
+    
+    state.loadedSlot = opts.slot
+    logging.info("Loaded volume %s into %s from %s" % (opts.slot,opts.archive,opts.changer))
+
+def unload(opts, state):
+    logging.info("Unloading volume %s to %s from %s" % (opts.slot,opts.changer,opts.archive))
+
+    source = opts.archive
+    destination = "/".join([opts.changer,opts.slot])
+  
+    if opts.slot == state.loadedSlot:
+        try:
+            Rclone.copy(source, destination)
+            state.loadedSlot = 0
+            logging.info("Unloaded volume %s to %s from %s" % (opts.slot, opts.changer, opts.archive))
+        except Exception as e:
+            logging.error("Failed to unload volume %s: %s" % (opts.slot, e))
+
+    else: 
+        logging.error("Asked to unload volume %s but loaded volume is %s" % (opts.slot, state.loadedSlot))
+        raise Exception("Volume %s not loaded" % opts.slot)
+
+def list(opts, state):
+    logging.info("Listing volumes in %s" % opts.changer)
+    for x in range(1,state.slots + 1):
+        print "{0}:VTAPE-{0:05n}".format(x)
+
+def slots(opts, state):
+    print state.slots
+
+def dispatch(command, commandOpts, state):
+    dispatch = {
+     'loaded': loaded,
+     'load': load,
+     'unload': unload,
+     'list': list,
+     'slots': slots,
+    }
+
+    dispatch[command](commandOpts, state)
+
+
+if __name__ == "__main__":
+    config = parseArgs(sys.argv)
+
+    logging.basicConfig(filename=config.logfile, level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+    logging.debug("Starting with args: %s" % vars(config))
+    logging.info("Loading state from %s" % config.statefile)
+
+    try:
+        stateF = open(config.statefile)
+        fcntl.flock(stateF, fcntl.LOCK_EX)
+        state = yaml.load(stateF)
+        stateF.close()
+
+    except IOError as e:
+        logging.warning("State file not present.  Starting from scratch and assuming no loaded volumes: %s" % e)
+        state = State()
+
+    commandOpts = CommandOpts(config)
+
+    Rclone.config = config.rclone_config
+
+    Rclone.localFile = config.archivedevice
+    
+    dispatch(config.command, commandOpts, state)
+
+    stateF = open(config.statefile,'w')
+    fcntl.lockf(stateF, fcntl.LOCK_EX)
+    yaml.dump(state, stateF, default_flow_style=False)
+    stateF.close()
+
+
+
+
+
+
+
+
+
