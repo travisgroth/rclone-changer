@@ -68,14 +68,14 @@ class CommandOpts(object):
 
 def parseArgs(args):
     defaults = { 
-                    'logfile': '/var/log/bacula/acd-changer.log', 
-                    'statefile': '/var/lib/bacula/acdchangerstate', 
+                    'logfile': '/var/log/bacula/rclone-changer.log', 
+                    'statefile': '/var/lib/bacula/rclone-changer.state', 
                 }
 
     parser = argparse.ArgumentParser()
     parser.set_defaults(**defaults)
     parser.add_argument('--rclone_config', default='/etc/bacula/rclone.conf')
-    parser.add_argument('--lockfile', default='/var/lib/bacula/.acdlock')
+    parser.add_argument('--lockfile', default='/var/lib/bacula/.rclonelock')
     parser.add_argument('changerdevice')
     parser.add_argument('command')
     parser.add_argument('slot')

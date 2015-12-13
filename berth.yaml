@@ -9,12 +9,12 @@ package:
     fpm:
         s: dir
         t: deb
-        name: acd-changer
+        name: rclone-changer
         version: $VERSION
         iteration: 1
         architecture: amd64
-        package: /project/acd-changer_${VERSION}.deb
+        package: /project/rclone-changer_${VERSION}.deb
         _arguments: 
-            - /project/acd-changer=/usr/sbin/acd-changer
+            - /project/rclone-changer=/usr/sbin/rclone-changer
 
 
