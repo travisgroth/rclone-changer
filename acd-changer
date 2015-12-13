@@ -75,6 +75,7 @@ def parseArgs(args):
     parser = argparse.ArgumentParser()
     parser.set_defaults(**defaults)
     parser.add_argument('--rclone_config', default='/etc/bacula/rclone.conf')
+    parser.add_argument('--lockfile', default='/var/lib/bacula/.acdlock')
     parser.add_argument('changerdevice')
     parser.add_argument('command')
     parser.add_argument('slot')
@@ -161,6 +162,10 @@ if __name__ == "__main__":
     logging.basicConfig(filename=config.logfile, level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
     logging.debug("Starting with args: %s" % vars(config))
     logging.info("Loading state from %s" % config.statefile)
+
+    logging.debug("Locking at '%s'" % config.lockfile)
+    lockF = open(config.lockfile,'w')
+    fcntl.lockf(lockF, fcntl.LOCK_EX)
 
     try:
         stateF = open(config.statefile)
