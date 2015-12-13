@@ -64,6 +64,8 @@ Storage Daemon config:
 * Spool is 500M
 * Changer wait time is longer than it should ever take to copy a volume, based on size
 
+
+
     Autochanger {
       Name = "ACD Autochanger"
       Device = ACD
@@ -91,6 +93,7 @@ Director config:
 * 1 month volume retention (my backups run fulls every first monday)
 * Volume size is limited to 1G
 * Allow recycling and pruning automatically
+
 
     Pool {
       Name = DisktoDisk-Offsite
