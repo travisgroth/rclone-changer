@@ -17,7 +17,7 @@ class Rclone(object):
     @staticmethod
     def _exec_(*args):
 
-        options = ['--config=%s' % Rclone.config, '--log-file=%s' % Rclone.logFile, '-q']
+        options = ['--config=%s' % Rclone.config, '--log-file=%s' % Rclone.logFile, '-q', '-c']
         logging.debug('Executing: rclone %s %s' % (' '.join(options),' '.join(args) ))
 
         output = open(os.devnull,'w')
