@@ -1,0 +1,20 @@
+environment:
+    VERSION: 0.1
+
+package:
+    image: tenzer/fpm
+    volumes:
+        .: /project
+
+    fpm:
+        s: dir
+        t: deb
+        name: acd-changer
+        version: $VERSION
+        iteration: 1
+        architecture: amd64
+        package: /project/acd-changer_${VERSION}.deb
+        _arguments: 
+            - /project/acd-changer=/usr/sbin/acd-changer
+
+
