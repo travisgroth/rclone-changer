@@ -46,6 +46,15 @@ tape "slots" in rclone-changer but this can be manually changed by manipulating 
 * Pre-label your "tapes" in bacula
 * TEST YOUR SETUP
 
+### Configuring rclone-chanager
+
+Not a whole lot goes into configuration, however there are some environmental assumptions you should check on.
+
+
+1. rclone-changer logs to /var/log/bacula.  Make sure the bacula user has permission to do so (rclone-changer runs as the bacula user)
+1. rclone-changer keeps state data in /var/lib/bacula.  Again, check permissions.
+1. rclone-changer assumes rclone is in /usr/bin/
+
 #### Examples
 
 Storage Daemon config:
@@ -55,26 +64,27 @@ Storage Daemon config:
 * Spool is 500M
 * Changer wait time is longer than it should ever take to copy a volume, based on size
 
->Autochanger {
-  Name = "ACD Autochanger"
-  Device = ACD
-  Changer Device = 'ACD:/Backups/bacula'
-  Changer Command = "/usr/sbin/rclone-changer %c %o %S %a"
-}
-Device {
-  Name = ACD
-  Media Type = File
-  Maximum Changer Wait = 18000
-  Archive Device = /stor/nobackup/vtape/acd
-  Autochanger = yes
-  LabelMedia = yes;                   # lets Bacula label unlabeled media
-  Random Access = Yes
-  AutomaticMount = no               # when device opened, read it
-  RemovableMedia = no
-  AlwaysOpen = no
-  Spool Directory = /mnt/bacula-spool
-  Maximum Spool Size = 524288000
-}
+    Autochanger {
+      Name = "ACD Autochanger"
+      Device = ACD
+      Changer Device = 'ACD:/Backups/bacula'
+      Changer Command = "/usr/sbin/rclone-changer %c %o %S %a"
+    }
+
+    Device {
+      Name = ACD
+      Media Type = File
+      Maximum Changer Wait = 18000
+      Archive Device = /stor/nobackup/vtape/acd
+      Autochanger = yes
+      LabelMedia = yes;                   # lets Bacula label unlabeled media
+      Random Access = Yes
+      AutomaticMount = no               # when device opened, read it
+      RemovableMedia = no
+      AlwaysOpen = no
+      Spool Directory = /mnt/bacula-spool
+      Maximum Spool Size = 524288000
+    }
 
 Director config:
 
@@ -82,13 +92,13 @@ Director config:
 * Volume size is limited to 1G
 * Allow recycling and pruning automatically
 
->Pool {
-  Name = DisktoDisk-Offsite
-  Pool Type = Backup
-  Recycle = yes                       # Bacula can automatically recycle Volumes
-  AutoPrune = yes                     # Prune expired volumes
-  Storage = ACD
-  Maximum Volume Bytes = 1073741824
-  AutoPrune = yes
-  Volume Retention = 4 weeks
-}
+    Pool {
+      Name = DisktoDisk-Offsite
+      Pool Type = Backup
+      Recycle = yes                       # Bacula can automatically recycle Volumes
+      AutoPrune = yes                     # Prune expired volumes
+      Storage = ACD
+      Maximum Volume Bytes = 1073741824
+      AutoPrune = yes
+      Volume Retention = 4 weeks
+    }
