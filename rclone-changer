@@ -266,12 +266,3 @@ if __name__ == "__main__":
     fcntl.lockf(stateF, fcntl.LOCK_EX)
     yaml.dump(state, stateF, default_flow_style=False)
     stateF.close()
-
-
-
-
-
-
-
-
-
