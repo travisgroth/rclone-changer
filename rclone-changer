@@ -69,17 +69,28 @@ class CommandOpts(object):
 
 def parseArgs(args):
 
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-    parser.add_argument('--lockfile', default='/var/lib/bacula/.rclonelock')
-    parser.add_argument('--logfile', default='/var/log/bacula/rclone-changer.log')
+    parser.add_argument('--lockfile', default='/var/lib/bacula/.rclonelock', 
+        help='Lock file to prevent more than one rclone call from running and mucking up the state file')
 
-    parser.add_argument('--rclone_path', default='/usr/bin/rclone')
-    parser.add_argument('--rclone_options', default=False)
-    parser.add_argument('--rclone_config', default='/etc/bacula/rclone.conf')
-    parser.add_argument('--rclone_log', default='/tmp/rclone.log')
+    parser.add_argument('--logfile', default='/var/log/bacula/rclone-changer.log', 
+        help='Where to store the rclone-changer log file (not the rclone log itself')
 
-    parser.add_argument('--statefile', default='/var/lib/bacula/rclone-changer.state')
+    parser.add_argument('--rclone_path', default='/usr/bin/rclone',
+        help='Path to rclone binary')
+
+    parser.add_argument('--rclone_options', default=False,
+        help='All additional rclone options you need to pass in a single argument')
+
+    parser.add_argument('--rclone_config', default='/etc/bacula/rclone.conf',
+        help='Path to rclone config for your cloud storage of choice (result of `rclone config`)')
+
+    parser.add_argument('--rclone_log', default='/tmp/rclone.log',
+        help='Where to have rclone itself log to')
+
+    parser.add_argument('--statefile', default='/var/lib/bacula/rclone-changer.state',
+        help='Where to store our "changer" state')
 
     parser.add_argument('changerdevice')
     parser.add_argument('command')
