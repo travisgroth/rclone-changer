@@ -68,10 +68,6 @@ class Rclone(object):
         return Rclone._exec_('move',source,destination)
 
     @staticmethod
-    def ls(path):
-        return Rclone._exec_('ls', path)
-
-    @staticmethod
     def exists(path):
         """
         Wrap a call to __exec__ to test if a file exists
