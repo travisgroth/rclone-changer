@@ -65,7 +65,7 @@ Storage Daemon config:
 * Changer wait time is longer than it should ever take to copy a volume, based on size
 
 
-
+```
     Autochanger {
       Name = "ACD Autochanger"
       Device = ACD
@@ -87,14 +87,15 @@ Storage Daemon config:
       Spool Directory = /mnt/bacula-spool
       Maximum Spool Size = 524288000
     }
+```
 
 Director config:
 
 * 1 month volume retention (my backups run fulls every first monday)
 * Volume size is limited to 1G
 * Allow recycling and pruning automatically
-
-
+    
+```
     Pool {
       Name = DisktoDisk-Offsite
       Pool Type = Backup
@@ -105,3 +106,4 @@ Director config:
       AutoPrune = yes
       Volume Retention = 4 weeks
     }
+```
