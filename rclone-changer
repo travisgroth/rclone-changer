@@ -10,6 +10,10 @@ import subprocess
 import fcntl
 
 class Rclone(object):
+    """
+    Rclone contains logic to convert simple commands to full rclone command line
+    calls with error handling
+    """
     rclone = '/usr/bin/rclone'
     config = '/etc/bacula/rclone.conf'
     logFile = '/tmp/rclone.log'
@@ -17,15 +21,23 @@ class Rclone(object):
 
     @staticmethod
     def _exec_(*args):
+        """
+        Generic call to execute rclone for use internally by the public rclone command subroutines
 
+        :param args: simple command list to pass to rclone after calculated options
+        :return: True on success.  
+        """
+
+        # Compile all the option flags (some implied, some passed by the user) into a single list
         flags = Rclone.options + ['--config=%s' % Rclone.config, '--log-file=%s' % Rclone.logFile, '-q', '-c']
         logging.debug('Executing: %s %s %s' % (Rclone.rclone, ' '.join(flags),' '.join(args) ))
 
+        # Actually call rclone with options, plus the operation specific arguments
         output = open(os.devnull,'w')
-
         callList = [ Rclone.rclone ] + flags + __builtins__.list(args)
         r = subprocess.call(callList,stderr=output,stdout=output)
         
+        # Basic error handling
         if r != 0:
             raise Exception('Rclone command failed.  Check log' % Rclone.logFile )
         else:
@@ -33,10 +45,26 @@ class Rclone(object):
 
     @staticmethod
     def copy(source,destination):
+        """
+        Wrap a call to __exec__ to copy a file
+
+
+        :param source: The source path/file
+        :param destination: The destination path
+        :returns: True on success
+        """
         return Rclone._exec_('copy',source,destination)
 
     @staticmethod
     def move(source,destination):
+        """
+        Wrap a call to __exec__ to move a file
+
+
+        :param source: The source path/file
+        :param destination: The destination path
+        :returns: True on success
+        """
         return Rclone._exec_('move',source,destination)
 
     @staticmethod
@@ -45,6 +73,13 @@ class Rclone(object):
 
     @staticmethod
     def exists(path):
+        """
+        Wrap a call to __exec__ to test if a file exists
+
+
+        :param path: The path to test
+        :returns: True if the file exists, False if it does not
+        """
         try:
             Rclone._exec_('ls', path)
         except Exception: 
@@ -53,10 +88,19 @@ class Rclone(object):
         return True
 
 class State(object):
+    """
+    State is a simple container class for the state of the tape changer, which includes 
+    slot count and which slot is loaded
+    """
     loadedSlot = 0
     slots = 8192
 
+
 class CommandOpts(object):
+    """
+    CommandOpts is a simple class containing the bacula-centric command to pass to subsequent
+    subroutines.
+    """
     changer = None
     command = None
     slot = None
@@ -108,6 +152,9 @@ def load(opts, state):
     source = "/".join([opts.changer,opts.slot,os.path.basename(opts.archive)])
     destination = os.path.dirname(opts.archive)
 
+    # Since I'm unsure if a standard SCSI changer would allow you to load a tape into an 
+    # occupied device, support that behavior just in case.  Basically if the 'drive' is not 
+    # empty and we are told to load a tape into it, unload it implicitly
     if state.loadedSlot != 0 and state.loadedSlot != opts.slot:
         logging.warning("Asked to load volume %s into %s but %s is loaded.  Unloading %s" % 
             (opts.slot,opts.archive,state.loadedSlot,state.loadedSlot))
@@ -118,28 +165,34 @@ def load(opts, state):
         unloadOpts.changer = opts.changer
         unload(unloadOpts, state)
     
+    # We've been told to load a slot that is already loaded.  Do nothing.
     if state.loadedSlot == opts.slot:    
         logging.info("Volume %s already loaded at %s from %s" % (opts.slot,opts.archive,opts.changer))
         return
 
     logging.info("Copying %s to %s for load" % (source, destination))
 
+    # Check if the source file exists.  Copy it locally if it does.
     if Rclone.exists(source):
         Rclone.copy(source,destination)
+    # If the source doesn't exist we create it locally, which is fine.
     else:
         logging.warning("Volume %s didn't exist in %s.  Creating a new file" % (opts.slot, opts.changer))
         os.unlink(opts.archive)
         open(opts.archive,'w').close()
     
+    # Update state after rclone command completion
     state.loadedSlot = opts.slot
     logging.info("Loaded volume %s into %s from %s" % (opts.slot,opts.archive,opts.changer))
 
+# Unload tape from a given slot
 def unload(opts, state):
     logging.info("Unloading volume %s to %s from %s" % (opts.slot,opts.changer,opts.archive))
 
     source = opts.archive
     destination = "/".join([opts.changer,opts.slot])
   
+    # If the specified volume is loaded, copy it to cloud storage and update state
     if opts.slot == state.loadedSlot:
         try:
             Rclone.copy(source, destination)
@@ -147,19 +200,23 @@ def unload(opts, state):
             logging.info("Unloaded volume %s to %s from %s" % (opts.slot, opts.changer, opts.archive))
         except Exception as e:
             logging.error("Failed to unload volume %s: %s" % (opts.slot, e))
-
+    # If we're asked to unload a volume that isn't loaded (according to state file) something
+    # has gone wrong
     else: 
         logging.error("Asked to unload volume %s but loaded volume is %s" % (opts.slot, state.loadedSlot))
         raise Exception("Volume %s not loaded" % opts.slot)
 
+# List changer slots with implied barcode data
 def list(opts, state):
     logging.info("Listing volumes in %s" % opts.changer)
     for x in range(1,state.slots + 1):
         print "{0}:VTAPE-{0:05n}".format(x)
 
+# Return number of changer slots
 def slots(opts, state):
     print state.slots
 
+# Call required sub based on changer action
 def dispatch(command, commandOpts, state):
     dispatch = {
      'loaded': loaded,
@@ -175,36 +232,40 @@ def dispatch(command, commandOpts, state):
 if __name__ == "__main__":
     config = parseArgs(sys.argv)
 
+    # Initialize logging
     logging.basicConfig(filename=config.logfile, level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
     logging.debug("Starting with args: %s" % vars(config))
     logging.info("Loading state from %s" % config.statefile)
 
+    # Get a lock for this run to prevent state and log file corruption
     logging.debug("Locking at '%s'" % config.lockfile)
     lockF = open(config.lockfile,'w')
     fcntl.lockf(lockF, fcntl.LOCK_EX)
 
+    # Load state or start with no state assumed
     try:
         stateF = open(config.statefile)
         fcntl.flock(stateF, fcntl.LOCK_EX)
         state = yaml.load(stateF)
         stateF.close()
-
     except IOError as e:
         logging.warning("State file not present.  Starting from scratch and assuming no loaded volumes: %s" % e)
         state = State()
 
-    commandOpts = CommandOpts(config)
-
+    # Set up rclone class for later
+    
     Rclone.config = config.rclone_config
     Rclone.rclone = config.rclone_path
     if config.rclone_options:
         Rclone.options = str(config.rclone_options).split(' ')
     Rclone.logFile = config.rclone_log
-
     Rclone.localFile = config.archivedevice
     
+    # Dispatch the command
+    commandOpts = CommandOpts(config)
     dispatch(config.command, commandOpts, state)
 
+    # Store final state and exit
     stateF = open(config.statefile,'w')
     fcntl.lockf(stateF, fcntl.LOCK_EX)
     yaml.dump(state, stateF, default_flow_style=False)
