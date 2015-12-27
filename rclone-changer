@@ -13,16 +13,17 @@ class Rclone(object):
     rclone = '/usr/bin/rclone'
     config = '/etc/bacula/rclone.conf'
     logFile = '/tmp/rclone.log'
+    options = []
 
     @staticmethod
     def _exec_(*args):
 
-        options = ['--config=%s' % Rclone.config, '--log-file=%s' % Rclone.logFile, '-q', '-c']
-        logging.debug('Executing: rclone %s %s' % (' '.join(options),' '.join(args) ))
+        flags = Rclone.options + ['--config=%s' % Rclone.config, '--log-file=%s' % Rclone.logFile, '-q', '-c']
+        logging.debug('Executing: %s %s %s' % (Rclone.rclone, ' '.join(flags),' '.join(args) ))
 
         output = open(os.devnull,'w')
 
-        callList = [ Rclone.rclone ] + options + __builtins__.list(args)
+        callList = [ Rclone.rclone ] + flags + __builtins__.list(args)
         r = subprocess.call(callList,stderr=output,stdout=output)
         
         if r != 0:
@@ -67,15 +68,19 @@ class CommandOpts(object):
         self.archive = params.archivedevice
 
 def parseArgs(args):
-    defaults = { 
-                    'logfile': '/var/log/bacula/rclone-changer.log', 
-                    'statefile': '/var/lib/bacula/rclone-changer.state', 
-                }
 
     parser = argparse.ArgumentParser()
-    parser.set_defaults(**defaults)
-    parser.add_argument('--rclone_config', default='/etc/bacula/rclone.conf')
+
     parser.add_argument('--lockfile', default='/var/lib/bacula/.rclonelock')
+    parser.add_argument('--logfile', default='/var/log/bacula/rclone-changer.log')
+
+    parser.add_argument('--rclone_path', default='/usr/bin/rclone')
+    parser.add_argument('--rclone_options', default=False)
+    parser.add_argument('--rclone_config', default='/etc/bacula/rclone.conf')
+    parser.add_argument('--rclone_log', default='/tmp/rclone.log')
+
+    parser.add_argument('--statefile', default='/var/lib/bacula/rclone-changer.state')
+
     parser.add_argument('changerdevice')
     parser.add_argument('command')
     parser.add_argument('slot')
@@ -180,6 +185,10 @@ if __name__ == "__main__":
     commandOpts = CommandOpts(config)
 
     Rclone.config = config.rclone_config
+    Rclone.rclone = config.rclone_path
+    if config.rclone_options:
+        Rclone.options = str(config.rclone_options).split(' ')
+    Rclone.logFile = config.rclone_log
 
     Rclone.localFile = config.archivedevice
     
