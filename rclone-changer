@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3.5
 
 import logging
 import argparse
@@ -140,7 +140,7 @@ def parseArgs(args):
     return parser.parse_args()
 
 def loaded(opts,state):
-    print state.loadedSlot
+    print(state.loadedSlot)
 
 def load(opts, state):
     logging.info("Loading volume %s into %s from %s" % (opts.slot,opts.archive,opts.changer))
@@ -206,11 +206,11 @@ def unload(opts, state):
 def list(opts, state):
     logging.info("Listing volumes in %s" % opts.changer)
     for x in range(1,state.slots + 1):
-        print "{0}:VTAPE-{0:05n}".format(x)
+        print("{0}:VTAPE-{0:05n}".format(x))
 
 # Return number of changer slots
 def slots(opts, state):
-    print state.slots
+    print(state.slots)
 
 # Call required sub based on changer action
 def dispatch(command, commandOpts, state):
