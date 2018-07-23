@@ -14,9 +14,14 @@ class Rclone(object):
     Rclone contains logic to convert simple commands to full rclone command line
     calls with error handling
     """
-    rclone = '/usr/bin/rclone'
-    config = '/etc/bacula/rclone.conf'
-    logFile = '/tmp/rclone.log'
+    rcloneBin  = '/usr/bin/rclone'
+    configFile = '/opt/bacula/rclone.conf'
+    logFile    = '/var/log/rclone.log'
+    logChanger = '/var/log/rclone-changer.log'
+    lockFile   = '/tmp/.rclonelock'
+    stateFile  = '/tmp/rclone-changer.state'
+
+    slots = 8192
     options = []
 
     @staticmethod
@@ -29,12 +34,12 @@ class Rclone(object):
         """
 
         # Compile all the option flags (some implied, some passed by the user) into a single list
-        flags = Rclone.options + ['--config=%s' % Rclone.config, '--log-file=%s' % Rclone.logFile, '-q', '-c']
-        logging.debug('Executing: %s %s %s' % (Rclone.rclone, ' '.join(flags),' '.join(args) ))
+        flags = Rclone.options + ['--config=%s' % Rclone.configFile, '--log-file=%s' % Rclone.logFile, '-q', '-c']
+        logging.debug('Executing: %s %s %s' % (Rclone.rcloneBin, ' '.join(flags),' '.join(args) ))
 
         # Actually call rclone with options, plus the operation specific arguments
         output = open(os.devnull,'w')
-        callList = [ Rclone.rclone ] + flags + __builtins__.list(args)
+        callList = [ Rclone.rcloneBin ] + flags + __builtins__.list(args)
         r = subprocess.call(callList,stderr=output,stdout=output)
         
         # Basic error handling
@@ -89,7 +94,7 @@ class State(object):
     slot count and which slot is loaded
     """
     loadedSlot = 0
-    slots = 8192
+    slots = Rclone.slots
 
 
 class CommandOpts(object):
@@ -111,25 +116,25 @@ def parseArgs(args):
 
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-    parser.add_argument('--lockfile', default='/var/lib/bacula/.rclonelock', 
+    parser.add_argument('--lockfile', default = Rclone.lockFile, 
         help='Lock file to prevent more than one rclone call from running and mucking up the state file')
 
-    parser.add_argument('--logfile', default='/var/log/bacula/rclone-changer.log', 
+    parser.add_argument('--logfile', default = Rclone.logChanger,
         help='Where to store the rclone-changer log file (not the rclone log itself')
 
-    parser.add_argument('--rclone_path', default='/usr/bin/rclone',
+    parser.add_argument('--rclone_path', default = Rclone.rcloneBin,
         help='Path to rclone binary')
 
-    parser.add_argument('--rclone_options', default=False,
+    parser.add_argument('--rclone_options', default = False,
         help='All additional rclone options you need to pass in a single argument')
 
-    parser.add_argument('--rclone_config', default='/etc/bacula/rclone.conf',
+    parser.add_argument('--rclone_config', default = Rclone.configFile,
         help='Path to rclone config for your cloud storage of choice (result of `rclone config`)')
 
-    parser.add_argument('--rclone_log', default='/tmp/rclone.log',
+    parser.add_argument('--rclone_log', default = Rclone.logFile,
         help='Where to have rclone itself log to')
 
-    parser.add_argument('--statefile', default='/var/lib/bacula/rclone-changer.state',
+    parser.add_argument('--statefile', default = Rclone.stateFile,
         help='Where to store our "changer" state')
 
     parser.add_argument('changerdevice')
@@ -250,8 +255,8 @@ if __name__ == "__main__":
 
     # Set up rclone class for later
     
-    Rclone.config = config.rclone_config
-    Rclone.rclone = config.rclone_path
+    Rclone.configFile = config.rclone_config
+    Rclone.rcloneBin = config.rclone_path
     if config.rclone_options:
         Rclone.options = str(config.rclone_options).split(' ')
     Rclone.logFile = config.rclone_log
