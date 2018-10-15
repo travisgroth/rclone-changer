@@ -6,7 +6,7 @@
 
 This script wraps rclone (http://rclone.org/) with a bacula (http://www.bacula.org) friendly
 interface.  Specifically, it implements the autochanger script interface that bacula uses
-to interact with tape changers.  See documentation at http://bacula.org/5.1.x-manuals/en/main/main/Autochanger_Resource.html
+to interact with tape changers.  See documentation at http://www.bacula.org/9.2.x-manuals/en/main/Autochanger_Resource.html
 
 ### What?
 
@@ -66,9 +66,10 @@ Storage Daemon config:
 
 
 ```
+    # bacula-sd.conf
     Autochanger {
-      Name = "ACD Autochanger"
-      Device = ACD
+      Name = "ACD Autochanger"      # The name of Autochanger
+      Device = ACD                  # Must match with bacula-sd Device
       Changer Device = 'ACD:/Backups/bacula'
       Changer Command = "/usr/sbin/rclone-changer %c %o %S %a"
     }
@@ -79,9 +80,9 @@ Storage Daemon config:
       Maximum Changer Wait = 18000
       Archive Device = /stor/nobackup/vtape/acd
       Autochanger = yes
-      LabelMedia = yes;                   # lets Bacula label unlabeled media
-      Random Access = Yes
-      AutomaticMount = no               # when device opened, read it
+      LabelMedia = yes                    # lets Bacula label unlabeled media
+      Random Access = yes
+      AutomaticMount = no                 # when device opened, read it
       RemovableMedia = no
       AlwaysOpen = no
       Spool Directory = /mnt/bacula-spool
@@ -96,12 +97,23 @@ Director config:
 * Allow recycling and pruning automatically
     
 ```
+    # bacula-dir.conf
+    Autochanger {
+      Name = ACD                    # A name of Storage
+      Address = 192.168.1.1
+      SDPort = 9103
+      Password = "6Nv2Tt2CJAf1TZA6t1cHtktA5aBUAARmJb/4BSckBLRm"
+      Device = ACD                  # Must match with bacula-sd.conf Device
+      Media Type = File             # Must match with bacula-sd.conf Media Type
+      Maximum Concurrent Jobs = 10
+    }   
+    
     Pool {
       Name = DisktoDisk-Offsite
       Pool Type = Backup
       Recycle = yes                       # Bacula can automatically recycle Volumes
       AutoPrune = yes                     # Prune expired volumes
-      Storage = ACD
+      Storage = ACD                       # Must match with bacula-dir.conf autochanger name
       Maximum Volume Bytes = 1073741824
       AutoPrune = yes
       Volume Retention = 4 weeks
