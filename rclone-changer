@@ -18,11 +18,11 @@ class Rclone(object):
     # Default params config
     #=====================================================
     rclone     = '/usr/bin/rclone'
-    config     = '/etc/bacula/rclone.conf'
+    config     = '/opt/bacula/etc/rclone.conf'
     logFile    = '/var/log/rclone.log'
     logChanger = '/var/log/rclone-changer.log'
-    lockFile   = '/etc/bacula/working/.rclonelock'
-    stateFile  = '/etc/bacula/working/rclone-changer.state'
+    lockFile   = '/opt/bacula/working/.rclonelock'
+    stateFile  = '/opt/bacula/working/rclone-changer.state'
     slots      = 100
     #=====================================================
 
