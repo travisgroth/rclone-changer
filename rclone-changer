@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3.5
 
 import logging
 import argparse
@@ -14,9 +14,18 @@ class Rclone(object):
     Rclone contains logic to convert simple commands to full rclone command line
     calls with error handling
     """
-    rclone = '/usr/bin/rclone'
-    config = '/etc/bacula/rclone.conf'
-    logFile = '/tmp/rclone.log'
+    #=====================================================
+    # Default params config
+    #=====================================================
+    rclone     = '/usr/bin/rclone'
+    config     = '/opt/bacula/etc/rclone.conf'
+    logFile    = '/var/log/rclone.log'
+    logChanger = '/var/log/rclone-changer.log'
+    lockFile   = '/opt/bacula/working/.rclonelock'
+    stateFile  = '/opt/bacula/working/rclone-changer.state'
+    slots      = 100
+    #=====================================================
+
     options = []
 
     @staticmethod
@@ -35,7 +44,7 @@ class Rclone(object):
         # Actually call rclone with options, plus the operation specific arguments
         output = open(os.devnull,'w')
         callList = [ Rclone.rclone ] + flags + __builtins__.list(args)
-        r = subprocess.call(callList,stderr=output,stdout=output)
+        r = subprocess.call(callList, stderr = output, stdout = output)
         
         # Basic error handling
         if r != 0:
@@ -53,7 +62,7 @@ class Rclone(object):
         :param destination: The destination path
         :returns: True on success
         """
-        return Rclone._exec_('copy',source,destination)
+        return Rclone._exec_('copy', source, destination)
 
     @staticmethod
     def move(source,destination):
@@ -65,7 +74,7 @@ class Rclone(object):
         :param destination: The destination path
         :returns: True on success
         """
-        return Rclone._exec_('move',source,destination)
+        return Rclone._exec_('move', source, destination)
 
     @staticmethod
     def exists(path):
@@ -89,7 +98,7 @@ class State(object):
     slot count and which slot is loaded
     """
     loadedSlot = 0
-    slots = 8192
+    slots = Rclone.slots
 
 
 class CommandOpts(object):
@@ -99,37 +108,37 @@ class CommandOpts(object):
     """
     changer = None
     command = None
-    slot = None
+    slot    = None
     archive = None
 
     def __init__(self, params):
         self.changer = params.changerdevice
-        self.slot = params.slot
+        self.slot    = params.slot
         self.archive = params.archivedevice
 
 def parseArgs(args):
 
-    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser = argparse.ArgumentParser(formatter_class = argparse.ArgumentDefaultsHelpFormatter)
 
-    parser.add_argument('--lockfile', default='/var/lib/bacula/.rclonelock', 
+    parser.add_argument('--lockfile', default = Rclone.lockFile,
         help='Lock file to prevent more than one rclone call from running and mucking up the state file')
 
-    parser.add_argument('--logfile', default='/var/log/bacula/rclone-changer.log', 
+    parser.add_argument('--logfile', default = Rclone.logChanger, 
         help='Where to store the rclone-changer log file (not the rclone log itself')
 
-    parser.add_argument('--rclone_path', default='/usr/bin/rclone',
+    parser.add_argument('--rclone_path', default = Rclone.rclone,
         help='Path to rclone binary')
 
-    parser.add_argument('--rclone_options', default=False,
+    parser.add_argument('--rclone_options', default = False,
         help='All additional rclone options you need to pass in a single argument')
 
-    parser.add_argument('--rclone_config', default='/etc/bacula/rclone.conf',
+    parser.add_argument('--rclone_config', default = Rclone.config,
         help='Path to rclone config for your cloud storage of choice (result of `rclone config`)')
 
-    parser.add_argument('--rclone_log', default='/tmp/rclone.log',
+    parser.add_argument('--rclone_log', default = Rclone.logFile,
         help='Where to have rclone itself log to')
 
-    parser.add_argument('--statefile', default='/var/lib/bacula/rclone-changer.state',
+    parser.add_argument('--statefile', default = Rclone.stateFile,
         help='Where to store our "changer" state')
 
     parser.add_argument('changerdevice')
@@ -139,13 +148,13 @@ def parseArgs(args):
 
     return parser.parse_args()
 
-def loaded(opts,state):
-    print state.loadedSlot
+def loaded(opts, state):
+    print(state.loadedSlot)
 
 def load(opts, state):
-    logging.info("Loading volume %s into %s from %s" % (opts.slot,opts.archive,opts.changer))
+    logging.info("Loading volume %s into %s from %s" % (opts.slot, opts.archive, opts.changer))
     
-    source = "/".join([opts.changer,opts.slot,os.path.basename(opts.archive)])
+    source = "/".join([opts.changer, opts.slot, os.path.basename(opts.archive)])
     destination = os.path.dirname(opts.archive)
 
     # Since I'm unsure if a standard SCSI changer would allow you to load a tape into an 
@@ -153,7 +162,7 @@ def load(opts, state):
     # empty and we are told to load a tape into it, unload it implicitly
     if state.loadedSlot != 0 and state.loadedSlot != opts.slot:
         logging.warning("Asked to load volume %s into %s but %s is loaded.  Unloading %s" % 
-            (opts.slot,opts.archive,state.loadedSlot,state.loadedSlot))
+            (opts.slot, opts.archive, state.loadedSlot, state.loadedSlot))
 
         unloadOpts = argparse.Namespace()
         unloadOpts.slot = state.loadedSlot
@@ -163,14 +172,14 @@ def load(opts, state):
     
     # We've been told to load a slot that is already loaded.  Do nothing.
     if state.loadedSlot == opts.slot:    
-        logging.info("Volume %s already loaded at %s from %s" % (opts.slot,opts.archive,opts.changer))
+        logging.info("Volume %s already loaded at %s from %s" % (opts.slot, opts.archive, opts.changer))
         return
 
     logging.info("Copying %s to %s for load" % (source, destination))
 
     # Check if the source file exists.  Copy it locally if it does.
     if Rclone.exists(source):
-        Rclone.copy(source,destination)
+        Rclone.copy(source, destination)
     # If the source doesn't exist we create it locally, which is fine.
     else:
         logging.warning("Volume %s didn't exist in %s.  Creating a new file" % (opts.slot, opts.changer))
@@ -179,14 +188,14 @@ def load(opts, state):
     
     # Update state after rclone command completion
     state.loadedSlot = opts.slot
-    logging.info("Loaded volume %s into %s from %s" % (opts.slot,opts.archive,opts.changer))
+    logging.info("Loaded volume %s into %s from %s" % (opts.slot, opts.archive, opts.changer))
 
 # Unload tape from a given slot
 def unload(opts, state):
-    logging.info("Unloading volume %s to %s from %s" % (opts.slot,opts.changer,opts.archive))
+    logging.info("Unloading volume %s to %s from %s" % (opts.slot, opts.changer, opts.archive))
 
     source = opts.archive
-    destination = "/".join([opts.changer,opts.slot])
+    destination = "/".join([opts.changer, opts.slot])
   
     # If the specified volume is loaded, copy it to cloud storage and update state
     if opts.slot == state.loadedSlot:
@@ -205,23 +214,22 @@ def unload(opts, state):
 # List changer slots with implied barcode data
 def list(opts, state):
     logging.info("Listing volumes in %s" % opts.changer)
-    for x in range(1,state.slots + 1):
-        print "{0}:VTAPE-{0:05n}".format(x)
+    for i in range(1, state.slots + 1):
+        print("{0}:VTAPE-{0:04n}".format(i))
 
 # Return number of changer slots
 def slots(opts, state):
-    print state.slots
+    print(state.slots)
 
 # Call required sub based on changer action
 def dispatch(command, commandOpts, state):
     dispatch = {
      'loaded': loaded,
-     'load': load,
+     'load'  : load,
      'unload': unload,
-     'list': list,
-     'slots': slots,
+     'list'  : list,
+     'slots' : slots,
     }
-
     dispatch[command](commandOpts, state)
 
 
@@ -229,13 +237,13 @@ if __name__ == "__main__":
     config = parseArgs(sys.argv)
 
     # Initialize logging
-    logging.basicConfig(filename=config.logfile, level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+    logging.basicConfig(filename = config.logfile, level = logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
     logging.debug("Starting with args: %s" % vars(config))
     logging.info("Loading state from %s" % config.statefile)
 
     # Get a lock for this run to prevent state and log file corruption
     logging.debug("Locking at '%s'" % config.lockfile)
-    lockF = open(config.lockfile,'w')
+    lockF = open(config.lockfile, 'w')
     fcntl.lockf(lockF, fcntl.LOCK_EX)
 
     # Load state or start with no state assumed
@@ -249,7 +257,6 @@ if __name__ == "__main__":
         state = State()
 
     # Set up rclone class for later
-    
     Rclone.config = config.rclone_config
     Rclone.rclone = config.rclone_path
     if config.rclone_options:
