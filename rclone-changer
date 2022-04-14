@@ -250,7 +250,7 @@ if __name__ == "__main__":
     try:
         stateF = open(config.statefile)
         fcntl.flock(stateF, fcntl.LOCK_EX)
-        state = yaml.load(stateF)
+        state = yaml.unsafe_load(stateF)
         stateF.close()
     except IOError as e:
         logging.warning("State file not present.  Starting from scratch and assuming no loaded volumes: %s" % e)
